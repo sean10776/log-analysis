@@ -13,4 +13,4 @@
 - [ ] Enhance UI
 - [ ] Add double click to edit filter, or F2 to edit filter like change the file name
 - [ ] Enhance readme and documentation
-- [ ] Add preview hint at focust mode tab title
+- [x] Change focus mode tab title
