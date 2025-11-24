@@ -14,16 +14,16 @@ import {
 // Import the internal _addProject function for testing
 const { _addProject } = require('../../commands');
 
-suite('Log Analysis Extension Test Suite', () => {
-    vscode.window.showInformationMessage('Starting Log Analysis tests.');
+suite('LogFocus Extension Test Suite', () => {
+    vscode.window.showInformationMessage('Starting LogFocus tests.');
 
     test('Extension should be present', () => {
-        const extension = vscode.extensions.getExtension('SeanOwO.log-analysis');
+        const extension = vscode.extensions.getExtension('SeanOwO.logfocus');
         assert.ok(extension, 'Extension should be installed');
     });
 
     test('Extension should activate', async () => {
-        const extension = vscode.extensions.getExtension('SeanOwO.log-analysis');
+        const extension = vscode.extensions.getExtension('SeanOwO.logfocus');
         assert.ok(extension, 'Extension should exist');
         
         await extension!.activate();

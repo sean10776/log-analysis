@@ -1,7 +1,7 @@
 {
-    "name": "log-analysis",
-    "displayName": "Log Analysis ext.",
-    "description": "Add highlights and filters to help log analysis",
+    "name": "logfocus",
+    "displayName": "LogFocus",
+    "description": "Enhanced log analysis with intelligent filtering and focus mode",
     "publisher": "SeanOwO",
     "repository": {
         "type": "git",
@@ -22,191 +22,191 @@
     "contributes": {
         "commands": [
             {
-                "command": "log-analysis.addGroup",
+                "command": "logfocus.addGroup",
                 "title": "Add Group",
                 "icon": "$(file-directory-create)"
             },
             {
-                "command": "log-analysis.editGroup",
+                "command": "logfocus.editGroup",
                 "title": "Edit a new name for This Group",
                 "icon": "$(edit)"
             },
             {
-                "command": "log-analysis.deleteGroup",
+                "command": "logfocus.deleteGroup",
                 "title": "Delete This Group",
                 "icon": "$(dialog-close)"
             },
             {
-                "command": "log-analysis.enableHighlight",
+                "command": "logfocus.enableHighlight",
                 "title": "Enable Highlight",
                 "icon": "$(paintcan)"
             },
             {
-                "command": "log-analysis.disableHighlight",
+                "command": "logfocus.disableHighlight",
                 "title": "Disable Highlight",
                 "icon": "$(paintcan)"
             },
             {
-                "command": "log-analysis.enableVisibility",
+                "command": "logfocus.enableVisibility",
                 "title": "Enable Visbility",
                 "icon": "$(eye)"
             },
             {
-                "command": "log-analysis.disableVisibility",
+                "command": "logfocus.disableVisibility",
                 "title": "Disable Visbility",
                 "icon": "$(eye-closed)"
             },
             {
-                "command": "log-analysis.turnOnFocusMode",
+                "command": "logfocus.turnOnFocusMode",
                 "title": "Turn on Focus Mode",
                 "icon": "$(symbol-keyword)"
             },
             {
-                "command": "log-analysis.deleteFilter",
+                "command": "logfocus.deleteFilter",
                 "title": "Delete This Filter",
                 "icon": "$(dialog-close)"
             },
             {
-                "command": "log-analysis.editFilter",
+                "command": "logfocus.editFilter",
                 "title": "Edit Regex for This Filter",
                 "icon": "$(edit)"
             },
             {
-                "command": "log-analysis.addFilter",
+                "command": "logfocus.addFilter",
                 "title": "Add a Filter",
                 "icon": "$(plus)"
             },
             {
-                "command": "log-analysis.enableExclude",
+                "command": "logfocus.enableExclude",
                 "title": "Exclude",
                 "icon": "$(dash)"
             },
             {
-                "command": "log-analysis.disableExclude",
+                "command": "logfocus.disableExclude",
                 "title": "Include",
                 "icon": "$(plus)"
             },
             {
-                "command": "log-analysis.deleteProject",
+                "command": "logfocus.deleteProject",
                 "title": "Delete This Project",
                 "icon": "$(dialog-close)"
             },
             {
-                "command": "log-analysis.editProject",
+                "command": "logfocus.editProject",
                 "title": "Edit a new name for This Project",
                 "icon": "$(edit)"
             },
             {
-                "command": "log-analysis.addProject",
+                "command": "logfocus.addProject",
                 "title": "Add Project",
                 "icon": "$(repo-create)"
             },
             {
-                "command": "log-analysis.openSettings",
+                "command": "logfocus.openSettings",
                 "title": "Open Settings",
                 "icon": "$(gear)"
             },
             {
-                "command": "log-analysis.refreshSettings",
+                "command": "logfocus.refreshSettings",
                 "title": "Refresh",
                 "icon": "$(refresh)"
             },
             {
-                "command": "log-analysis.selectProject",
+                "command": "logfocus.selectProject",
                 "title": "Select project"
             }
         ],
         "menus": {
             "view/item/context": [
                 {
-                    "command": "log-analysis.addFilter",
+                    "command": "logfocus.addFilter",
                     "when": "view == filters && viewItem =~ /^g-/",
                     "group": "inline@1"
                 },
                 {
-                    "command": "log-analysis.enableExclude",
+                    "command": "logfocus.enableExclude",
                     "when": "view == filters && viewItem =~ /^f-/ && viewItem =~ /-include/",
                     "group": "inline@1.5"
                 },
                 {
-                    "command": "log-analysis.disableExclude",
+                    "command": "logfocus.disableExclude",
                     "when": "view == filters && viewItem =~ /^f-/ && viewItem =~ /-exclude/",
                     "group": "inline@1.5"
                 },
                 {
-                    "command": "log-analysis.editGroup",
+                    "command": "logfocus.editGroup",
                     "when": "view == filters && viewItem =~ /^g-/",
                     "group": "inline@2"
                 },
                 {
-                    "command": "log-analysis.editFilter",
+                    "command": "logfocus.editFilter",
                     "when": "view == filters && viewItem =~ /^f-/",
                     "group": "inline@2"
                 },
                 {
-                    "command": "log-analysis.editProject",
+                    "command": "logfocus.editProject",
                     "when": "view == filters.settings",
                     "group": "inline@2"
                 },
                 {
-                    "command": "log-analysis.disableHighlight",
+                    "command": "logfocus.disableHighlight",
                     "when": "view == filters && viewItem =~ /-lit/",
                     "group": "inline@3"
                 },
                 {
-                    "command": "log-analysis.enableHighlight",
+                    "command": "logfocus.enableHighlight",
                     "when": "view == filters && viewItem =~ /-unlit/",
                     "group": "inline@3"
                 },
                 {
-                    "command": "log-analysis.disableVisibility",
+                    "command": "logfocus.disableVisibility",
                     "when": "view == filters && viewItem =~ /-visible/",
                     "group": "inline@4"
                 },
                 {
-                    "command": "log-analysis.enableVisibility",
+                    "command": "logfocus.enableVisibility",
                     "when": "view == filters && viewItem =~ /-invisible/",
                     "group": "inline@4"
                 },
                 {
-                    "command": "log-analysis.deleteGroup",
+                    "command": "logfocus.deleteGroup",
                     "when": "view == filters && viewItem =~ /^g-/",
                     "group": "inline@5"
                 },
                 {
-                    "command": "log-analysis.deleteFilter",
+                    "command": "logfocus.deleteFilter",
                     "when": "view == filters && viewItem =~ /^f-/",
                     "group": "inline@5"
                 },
                 {
-                    "command": "log-analysis.deleteProject",
+                    "command": "logfocus.deleteProject",
                     "when": "view == filters.settings",
                     "group": "inline@5"
                 }
             ],
             "view/title": [
                 {
-                    "command": "log-analysis.addGroup",
+                    "command": "logfocus.addGroup",
                     "when": "view == filters",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "log-analysis.turnOnFocusMode",
+                    "command": "logfocus.turnOnFocusMode",
                     "when": "view == filters",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "log-analysis.addProject",
+                    "command": "logfocus.addProject",
                     "when": "view == filters.settings",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "log-analysis.openSettings",
+                    "command": "logfocus.openSettings",
                     "when": "view == filters.settings",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "log-analysis.refreshSettings",
+                    "command": "logfocus.refreshSettings",
                     "when": "view == filters.settings",
                     "group": "navigation@3"
                 }
@@ -214,7 +214,7 @@
         },
         "keybindings": [
             {
-                "command": "log-analysis.turnOnFocusMode",
+                "command": "logfocus.turnOnFocusMode",
                 "key": "ctrl+h",
                 "mac": "cmd+h"
             }
@@ -237,8 +237,8 @@
             "activitybar": [
                 {
                     "id": "filter_project_setting",
-                    "title": "Log Analysis",
-                    "icon": "$(preview)"
+                    "title": "LogFocus",
+                    "icon": "image/new_icon.svg"
                 }
             ]
         }

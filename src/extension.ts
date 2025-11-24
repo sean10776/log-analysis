@@ -88,12 +88,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     //register commands
     let disposableAddProject = vscode.commands.registerCommand(
-        "log-analysis.addProject",
+        "logfocus.addProject",
         () => addProject(state));
     context.subscriptions.push(disposableAddProject);
 
     let disposibleEditProject = vscode.commands.registerCommand(
-        "log-analysis.editProject",
+        "logfocus.editProject",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in Log Analysis Projects');
@@ -106,7 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleEditProject);
 
     let disposableDeleteProject = vscode.commands.registerCommand(
-        "log-analysis.deleteProject",
+        "logfocus.deleteProject",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in Log Analysis Projects');
@@ -118,12 +118,12 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableDeleteProject);
 
     let disposableOpenSettings = vscode.commands.registerCommand(
-        "log-analysis.openSettings",
+        "logfocus.openSettings",
         () => openSettings(state.globalStorageUri));
     context.subscriptions.push(disposableOpenSettings);
 
     let disposableRefreshSettings = vscode.commands.registerCommand(
-        "log-analysis.refreshSettings",
+        "logfocus.refreshSettings",
         () => {
             refreshSettings(state);
             updateTitle();
@@ -131,7 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableRefreshSettings);
 
     let disposableSelectProject = vscode.commands.registerCommand(
-        "log-analysis.selectProject",
+        "logfocus.selectProject",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in Log Analysis+ Projects');
@@ -145,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableSelectProject);
 
     let disposableEnableVisibility = vscode.commands.registerCommand(
-        "log-analysis.enableVisibility",
+        "logfocus.enableVisibility",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -157,7 +157,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableEnableVisibility);
 
     let disposableDisableVisibility = vscode.commands.registerCommand(
-        "log-analysis.disableVisibility",
+        "logfocus.disableVisibility",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -169,13 +169,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableDisableVisibility);
 
     let disposableTurnOnFocusMode = vscode.commands.registerCommand(
-        "log-analysis.turnOnFocusMode",
+        "logfocus.turnOnFocusMode",
         () => turnOnFocusMode()
     );
     context.subscriptions.push(disposableTurnOnFocusMode);
 
     let disposibleAddFilter = vscode.commands.registerCommand(
-        "log-analysis.addFilter",
+        "logfocus.addFilter",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -187,7 +187,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleAddFilter);
 
     let disposibleEditFilter = vscode.commands.registerCommand(
-        "log-analysis.editFilter",
+        "logfocus.editFilter",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -199,7 +199,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleEditFilter);
 
     let disposibleDeleteFilter = vscode.commands.registerCommand(
-        "log-analysis.deleteFilter",
+        "logfocus.deleteFilter",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -211,7 +211,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleDeleteFilter);
 
     let disposibleEnableHighlight = vscode.commands.registerCommand(
-        "log-analysis.enableHighlight",
+        "logfocus.enableHighlight",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -223,7 +223,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleEnableHighlight);
 
     let disposibleDisableHighlight = vscode.commands.registerCommand(
-        "log-analysis.disableHighlight",
+        "logfocus.disableHighlight",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -235,13 +235,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleDisableHighlight);
 
     let disposibleAddGroup = vscode.commands.registerCommand(
-        "log-analysis.addGroup",
+        "logfocus.addGroup",
         () => addGroup(state)
     );
     context.subscriptions.push(disposibleAddGroup);
 
     let disposibleEditGroup = vscode.commands.registerCommand(
-        "log-analysis.editGroup",
+        "logfocus.editGroup",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');
@@ -253,7 +253,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposibleEditGroup);
 
     let disposableEnableExclude = vscode.commands.registerCommand(
-        "log-analysis.enableExclude",
+        "logfocus.enableExclude",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is executed with button in FILTERS');
@@ -265,7 +265,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableEnableExclude);
 
     let disposableDisableExclude = vscode.commands.registerCommand(
-        "log-analysis.disableExclude",
+        "logfocus.disableExclude",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is executed with button in FILTERS');
@@ -277,7 +277,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposableDisableExclude);
 
     let disposibleDeleteGroup = vscode.commands.registerCommand(
-        "log-analysis.deleteGroup",
+        "logfocus.deleteGroup",
         (treeItem: vscode.TreeItem) => {
             if (treeItem === undefined) {
                 vscode.window.showErrorMessage('This command is excuted with button in FILTERS');

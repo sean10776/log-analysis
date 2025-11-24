@@ -14,7 +14,7 @@ function getExtensionConfigFile(storageUri: vscode.Uri): string {
         fs.mkdirSync(storagePath, { recursive: true });
     }
 
-    return path.join(storagePath, "log_analysis_set.json");
+    return path.join(storagePath, "logfocus_settings.json");
 }
 
 // Extension configuration management
