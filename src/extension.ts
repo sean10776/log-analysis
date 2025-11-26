@@ -15,17 +15,73 @@ import {
     deleteProject,
     refreshSettings,
     selectProject,
-    setExclude
+    setExclude,
+    exportProject,
+    importProject
 } from "./commands";
 import { createState, State } from "./utils";
 import { openSettings } from "./settings";
+import { EditorCacheEntry } from "./filter";
 
 // Simple debounce with setTimeout
 let refreshTimeout: NodeJS.Timeout | null = null;
 
+function logFiltersAndCache(state: State) {
+    const output = state.outputChannel;
+    output.clear();
+    output.appendLine("=".repeat(80));
+    output.appendLine("LogFocus - Filter and Cache Status");
+    output.appendLine("=".repeat(80));
+    output.appendLine(`Timestamp: ${new Date().toISOString()}`);
+    output.appendLine("");
+
+    if (!state.selectedProject) {
+        output.appendLine("No project selected");
+        return;
+    }
+
+    output.appendLine(`Project: ${state.selectedProject.name}`);
+    output.appendLine(`Total Groups: ${state.selectedProject.groups.size}`);
+    output.appendLine(`Total Filters: ${state.selectedProject.filters.size}`);
+    output.appendLine("");
+
+    // Iterate through groups and filters
+    state.selectedProject.groups.forEach((group, groupId) => {
+        output.appendLine(`┌─ Group: ${group.name} (${group.filters.size} filters)`);
+        
+        group.filters.forEach((filter, filterId) => {
+            const cacheStats = filter.getCacheStats();
+            output.appendLine(`│  ├─ Filter: ${filter.regex.source.substring(0, 50)}${filter.regex.source.length > 50 ? '...' : ''}`);
+            output.appendLine(`│  │  ├─ Color: ${filter.color}`);
+            output.appendLine(`│  │  ├─ Highlighted: ${filter.isHighlighted}`);
+            output.appendLine(`│  │  ├─ Shown: ${filter.isShown}`);
+            output.appendLine(`│  │  ├─ Exclude: ${filter.isExclude}`);
+            output.appendLine(`│  │  ├─ Count: ${filter.count}`);
+            output.appendLine(`│  │  └─ Cache: ${cacheStats.cachedFiles} file(s)`);
+            
+            if (cacheStats.cachedFiles > 0) {
+                cacheStats.cacheEntries.forEach((entry: EditorCacheEntry, uri: string) => {
+                    const fileName = uri.split('/').pop() || uri;
+                    output.appendLine(`│  │     └─ ${fileName}: ${entry.count} matches`);
+                });
+            }
+        });
+        output.appendLine("│");
+    });
+
+    output.appendLine("=".repeat(80));
+}
+
 export function activate(context: vscode.ExtensionContext) {
-    const state: State = createState(context.globalStorageUri);
+    // Create output channel for LogFocus
+    const outputChannel = vscode.window.createOutputChannel("LogFocus");
+    context.subscriptions.push(outputChannel);
+    
+    const state: State = createState(context.globalStorageUri, outputChannel);
     refreshSettings(state);
+
+    // Log initial state
+    logFiltersAndCache(state);
 
     //tell vs code to open focus:... uris with state.focusProvider
     const disposableFocus = vscode.workspace.registerTextDocumentContentProvider(
@@ -143,6 +199,20 @@ export function activate(context: vscode.ExtensionContext) {
             }
         });
     context.subscriptions.push(disposableSelectProject);
+
+    let disposableExportProject = vscode.commands.registerCommand(
+        "logfocus.exportProject",
+        (treeItem: vscode.TreeItem) => {
+            exportProject(state, treeItem);
+        });
+    context.subscriptions.push(disposableExportProject);
+
+    let disposableImportProject = vscode.commands.registerCommand(
+        "logfocus.importProject",
+        () => {
+            importProject(state);
+        });
+    context.subscriptions.push(disposableImportProject);
 
     let disposableEnableVisibility = vscode.commands.registerCommand(
         "logfocus.enableVisibility",
@@ -287,6 +357,15 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
     context.subscriptions.push(disposibleDeleteGroup);
+
+    let disposableShowFilterStats = vscode.commands.registerCommand(
+        "logfocus.showFilterStats",
+        () => {
+            logFiltersAndCache(state);
+            state.outputChannel.show();
+        }
+    );
+    context.subscriptions.push(disposableShowFilterStats);
 }
 
 // this method is called when your extension is deactivated

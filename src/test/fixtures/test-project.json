@@ -1,0 +1,27 @@
+{
+    "name": "Test Import Project",
+    "groups": [
+        {
+            "name": "Error Group",
+            "filters": [
+                {
+                    "regex": "ERROR|Error|error",
+                    "color": "hsl(0, 50%, 40%)"
+                },
+                {
+                    "regex": "FATAL|Fatal|fatal",
+                    "color": "hsl(10, 50%, 40%)"
+                }
+            ]
+        },
+        {
+            "name": "Warning Group",
+            "filters": [
+                {
+                    "regex": "WARN|Warning|warning",
+                    "color": "hsl(40, 50%, 40%)"
+                }
+            ]
+        }
+    ]
+}

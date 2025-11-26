@@ -457,7 +457,12 @@ function createDefaultProject(state: State) {
 export function refreshSettings(state: State) {
     const { projects, selectedProject } = readSettings(state.globalStorageUri);
     state.projectsMap = projects;
-    state.selectedProject = selectedProject;
+    if (state.selectedProject && selectedProject !== state.selectedProject) {
+        state.selectedProject.filters.forEach((filter) => {
+            filter.dispose();
+        });
+        state.selectedProject = selectedProject;
+    }
 
     // Add a project named "NONAMED" in the following cases:
     // - A default project is generated for users who do not use the project feature.
@@ -472,3 +477,112 @@ export function refreshSettings(state: State) {
     updateFilterTreeViewAndFocusProvider(state);
 }
 
+export async function exportProject(state: State, projectItem: any) {
+    const projectId = projectItem?.id;
+    if (!projectId) {
+        vscode.window.showErrorMessage("No project selected for export.");
+        return;
+    }
+
+    const project = state.projectsMap.get(projectId);
+    if (!project) {
+        vscode.window.showErrorMessage("Project not found.");
+        return;
+    }
+
+    const defaultUri = vscode.Uri.file(`${project.name}.json`);
+    const uri = await vscode.window.showSaveDialog({
+        defaultUri,
+        filters: {
+            'JSON Files': ['json'],
+            'All Files': ['*']
+        },
+        title: `Export Project: ${project.name}`
+    });
+
+    if (!uri) {
+        return; // User cancelled
+    }
+
+    try {
+        // Get the project file path from internal storage
+        const { getProjectFilePath, projectFileName } = require('./settings');
+        const projectFile = getProjectFilePath(state.globalStorageUri, projectFileName(project));
+        
+        // Read the existing project file and copy to export location
+        const content = await vscode.workspace.fs.readFile(vscode.Uri.file(projectFile));
+        await vscode.workspace.fs.writeFile(uri, content);
+        
+        vscode.window.showInformationMessage(`Project "${project.name}" exported successfully.`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to export project: ${error}`);
+    }
+}
+
+export async function importProject(state: State) {
+    const uris = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        filters: {
+            'JSON Files': ['json'],
+            'All Files': ['*']
+        },
+        title: 'Import Project'
+    });
+
+    if (!uris || uris.length === 0) {
+        return; // User cancelled
+    }
+
+    try {
+        // Read the file content
+        const content = await vscode.workspace.fs.readFile(uris[0]);
+        const data = JSON.parse(content.toString());
+
+        // Validate data structure
+        if (!data.name || !Array.isArray(data.groups)) {
+            vscode.window.showErrorMessage("Invalid project file format.");
+            return;
+        }
+
+        // Check if project with same name already exists
+        let projectName = data.name;
+        let counter = 1;
+        while (state.projectsMap.has(projectName)) {
+            projectName = `${data.name}_${counter}`;
+            counter++;
+        }
+
+        // Save to temporary file in projects directory and use loadProject
+        const { getProjectFilePath, loadProject } = require('./settings');
+        const tempFileName = `${projectName}.json`;
+        const tempFilePath = getProjectFilePath(state.globalStorageUri, tempFileName);
+        
+        // Write the content with potentially renamed project
+        const updatedData = { ...data, name: projectName };
+        await vscode.workspace.fs.writeFile(
+            vscode.Uri.file(tempFilePath),
+            Buffer.from(JSON.stringify(updatedData, null, 4), 'utf8')
+        );
+        
+        // Load using existing loadProject function
+        const newProject = loadProject(state.globalStorageUri, tempFileName);
+        
+        if (!newProject) {
+            vscode.window.showErrorMessage("Failed to load imported project.");
+            return;
+        }
+
+        // Add to projects map
+        state.projectsMap.set(newProject.name, newProject);
+        
+        // Save settings
+        saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
+        
+        // Refresh UI
+        updateProjectTreeView(state);
+        
+        vscode.window.showInformationMessage(`Project "${projectName}" imported successfully.`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to import project: ${error}`);
+    }
+}

@@ -1,5 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { Filter } from '../../filter';
 import { createProject, createGroup, createState } from '../../utils';
 import { 
@@ -7,8 +9,9 @@ import {
     setVisibility, 
     setExclude,
     deleteFilter,
-    deleteGroup,
-    selectProject
+    selectProject,
+    exportProject,
+    importProject
 } from '../../commands';
 
 // Import the internal _addProject function for testing
@@ -77,7 +80,7 @@ suite('LogFocus Extension Test Suite', () => {
     test('setHighlight command behavior', () => {
         // Create test state and data
         const testUri = vscode.Uri.file('/tmp/test');
-        const state = createState(testUri);
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
         const project = createProject('Test Project');
         const group = createGroup('Test Group');
         const filter = new Filter(new RegExp('test'));
@@ -107,7 +110,7 @@ suite('LogFocus Extension Test Suite', () => {
     test('setVisibility command behavior', () => {
         // Create test state and data
         const testUri = vscode.Uri.file('/tmp/test');
-        const state = createState(testUri);
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
         const project = createProject('Test Project');
         const group = createGroup('Test Group');
         const filter = new Filter(new RegExp('test'));
@@ -136,7 +139,7 @@ suite('LogFocus Extension Test Suite', () => {
     test('setExclude command behavior', () => {
         // Create test state and data
         const testUri = vscode.Uri.file('/tmp/test');
-        const state = createState(testUri);
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
         const project = createProject('Test Project');
         const filter = new Filter(new RegExp('test'));
 
@@ -162,7 +165,7 @@ suite('LogFocus Extension Test Suite', () => {
     test('deleteFilter command behavior', () => {
         // Create test state and data
         const testUri = vscode.Uri.file('/tmp/test');
-        const state = createState(testUri);
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
         const project = createProject('Test Project');
         const group = createGroup('Test Group');
         const filter = new Filter(new RegExp('test'));
@@ -191,7 +194,7 @@ suite('LogFocus Extension Test Suite', () => {
     test('selectProject command behavior', () => {
         // Create test state and data
         const testUri = vscode.Uri.file('/tmp/test');
-        const state = createState(testUri);
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
         const project1 = createProject('Project 1');
         const project2 = createProject('Project 2');
 
@@ -216,5 +219,200 @@ suite('LogFocus Extension Test Suite', () => {
         assert.strictEqual(state.selectedProject, project2, 'Project 2 should be selected');
         assert.strictEqual(project1.selected, false, 'Project 1 should have selected=false');
         assert.strictEqual(project2.selected, true, 'Project 2 should have selected=true');
+    });
+
+    test('exportProject command behavior', async () => {
+        // Create test state and data
+        const testUri = vscode.Uri.file(path.join(__dirname, '../../../test-storage'));
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
+        const project = createProject('Export Test Project');
+        const group = createGroup('Test Group');
+        const filter1 = new Filter(new RegExp('error'), 'hsl(0, 50%, 40%)');
+        const filter2 = new Filter(new RegExp('warning'), 'hsl(40, 50%, 40%)');
+
+        // Setup test data
+        project.groups.set(group.id, group);
+        project.filters.set(filter1.id, filter1);
+        project.filters.set(filter2.id, filter2);
+        group.filters.set(filter1.id, filter1);
+        group.filters.set(filter2.id, filter2);
+        state.projectsMap.set(project.name, project);
+        state.selectedProject = project;
+
+        // Save the project first (exportProject relies on saved project files)
+        const { saveProject } = require('../../settings');
+        saveProject(testUri, project);
+
+        // Create a temporary export path
+        const exportPath = path.join(__dirname, '../../../test-storage/exported-project.json');
+        const exportUri = vscode.Uri.file(exportPath);
+
+        // Mock the showSaveDialog to return our test path
+        const originalShowSaveDialog = vscode.window.showSaveDialog;
+        vscode.window.showSaveDialog = async () => exportUri;
+
+        try {
+            // Execute export
+            const projectTreeItem = { id: project.name } as any;
+            await exportProject(state, projectTreeItem);
+
+            // Verify the exported file exists
+            assert.ok(fs.existsSync(exportPath), 'Exported file should exist');
+
+            // Verify the exported content
+            const exportedContent = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
+            assert.strictEqual(exportedContent.name, 'Export Test Project', 'Exported project name should match');
+            assert.strictEqual(exportedContent.groups.length, 1, 'Exported project should have 1 group');
+            assert.strictEqual(exportedContent.groups[0].name, 'Test Group', 'Exported group name should match');
+            assert.strictEqual(exportedContent.groups[0].filters.length, 2, 'Exported group should have 2 filters');
+
+            // Clean up
+            if (fs.existsSync(exportPath)) {
+                fs.unlinkSync(exportPath);
+            }
+        } finally {
+            // Restore original function
+            vscode.window.showSaveDialog = originalShowSaveDialog;
+        }
+    });
+
+    test('importProject command behavior', async () => {
+        // Create test state
+        const testUri = vscode.Uri.file(path.join(__dirname, '../../../test-storage'));
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
+
+        // Ensure the test-storage directory exists
+        const testStoragePath = testUri.fsPath;
+        if (!fs.existsSync(testStoragePath)) {
+            fs.mkdirSync(testStoragePath, { recursive: true });
+        }
+
+        // Use the test fixture file from src directory (not compiled)
+        const fixtureFile = path.join(__dirname, '../../../src/test/fixtures/test-project.json');
+        const importUri = vscode.Uri.file(fixtureFile);
+
+        // Verify fixture file exists
+        if (!fs.existsSync(fixtureFile)) {
+            assert.fail(`Test fixture file not found at: ${fixtureFile}`);
+        }
+
+        // Mock the showOpenDialog to return our test file
+        const originalShowOpenDialog = vscode.window.showOpenDialog;
+        vscode.window.showOpenDialog = async () => [importUri];
+
+        // Mock showInformationMessage to avoid UI interaction
+        const originalShowInformationMessage = vscode.window.showInformationMessage;
+        let importSuccessMessage = '';
+        vscode.window.showInformationMessage = async (message: string) => {
+            importSuccessMessage = message;
+            return undefined as any;
+        };
+
+        try {
+            // Verify initial state
+            assert.strictEqual(state.projectsMap.size, 0, 'Projects map should be empty initially');
+
+            // Execute import
+            await importProject(state);
+
+            // Verify the project was imported
+            assert.ok(state.projectsMap.has('Test Import Project'), 'Imported project should be in projects map');
+            
+            const importedProject = state.projectsMap.get('Test Import Project')!;
+            assert.strictEqual(importedProject.name, 'Test Import Project', 'Imported project name should match');
+            assert.strictEqual(importedProject.groups.size, 2, 'Imported project should have 2 groups');
+            assert.strictEqual(importedProject.filters.size, 3, 'Imported project should have 3 filters total');
+
+            // Verify groups
+            const errorGroup = Array.from(importedProject.groups.values()).find(g => g.name === 'Error Group');
+            const warningGroup = Array.from(importedProject.groups.values()).find(g => g.name === 'Warning Group');
+            
+            assert.ok(errorGroup, 'Error Group should exist');
+            assert.ok(warningGroup, 'Warning Group should exist');
+            assert.strictEqual(errorGroup!.filters.size, 2, 'Error Group should have 2 filters');
+            assert.strictEqual(warningGroup!.filters.size, 1, 'Warning Group should have 1 filter');
+
+            // Verify success message
+            assert.ok(importSuccessMessage.includes('Test Import Project'), 'Success message should include project name');
+            assert.ok(importSuccessMessage.includes('imported successfully'), 'Success message should confirm import');
+        } finally {
+            // Restore original functions
+            vscode.window.showOpenDialog = originalShowOpenDialog;
+            vscode.window.showInformationMessage = originalShowInformationMessage;
+
+            // Clean up created files
+            const projectsDir = path.join(testStoragePath, 'projects');
+            if (fs.existsSync(projectsDir)) {
+                const files = fs.readdirSync(projectsDir);
+                files.forEach(file => {
+                    fs.unlinkSync(path.join(projectsDir, file));
+                });
+            }
+        }
+    });
+
+    test('importProject with duplicate name behavior', async () => {
+        // Create test state with existing project
+        const testUri = vscode.Uri.file(path.join(__dirname, '../../../test-storage'));
+        const state = createState(testUri, vscode.window.createOutputChannel("Test"));
+        
+        // Ensure the test-storage directory exists
+        const testStoragePath = testUri.fsPath;
+        if (!fs.existsSync(testStoragePath)) {
+            fs.mkdirSync(testStoragePath, { recursive: true });
+        }
+
+        const existingProject = createProject('Test Import Project');
+        state.projectsMap.set(existingProject.name, existingProject);
+
+        // Use the test fixture file from src directory (not compiled)
+        const fixtureFile = path.join(__dirname, '../../../src/test/fixtures/test-project.json');
+        const importUri = vscode.Uri.file(fixtureFile);
+
+        // Mock the showOpenDialog
+        const originalShowOpenDialog = vscode.window.showOpenDialog;
+        vscode.window.showOpenDialog = async () => [importUri];
+
+        // Mock showInformationMessage
+        const originalShowInformationMessage = vscode.window.showInformationMessage;
+        let importSuccessMessage = '';
+        vscode.window.showInformationMessage = async (message: string) => {
+            importSuccessMessage = message;
+            return undefined as any;
+        };
+
+        try {
+            // Verify initial state
+            assert.strictEqual(state.projectsMap.size, 1, 'Should have 1 project initially');
+
+            // Execute import
+            await importProject(state);
+
+            // Verify the original project still exists
+            assert.ok(state.projectsMap.has('Test Import Project'), 'Original project should still exist');
+            
+            // Verify the new project was imported with a modified name
+            assert.ok(state.projectsMap.has('Test Import Project_1'), 'Imported project should have modified name');
+            
+            const importedProject = state.projectsMap.get('Test Import Project_1')!;
+            assert.strictEqual(importedProject.name, 'Test Import Project_1', 'Imported project should have incremented name');
+            assert.strictEqual(importedProject.groups.size, 2, 'Imported project should have correct structure');
+
+            // Verify success message contains the modified name
+            assert.ok(importSuccessMessage.includes('Test Import Project_1'), 'Success message should show modified name');
+        } finally {
+            // Restore original functions
+            vscode.window.showOpenDialog = originalShowOpenDialog;
+            vscode.window.showInformationMessage = originalShowInformationMessage;
+
+            // Clean up created files
+            const projectsDir = path.join(testStoragePath, 'projects');
+            if (fs.existsSync(projectsDir)) {
+                const files = fs.readdirSync(projectsDir);
+                files.forEach(file => {
+                    fs.unlinkSync(path.join(projectsDir, file));
+                });
+            }
+        }
     });
 });

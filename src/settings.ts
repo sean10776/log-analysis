@@ -62,11 +62,11 @@ export function openSettings(storageUri: vscode.Uri) {
     });
 }
 
-function projectFileName(project: Project): string {
+export function projectFileName(project: Project): string {
     return `${project.name}.json`;
 }
 
-function getProjectFilePath(storageUri: vscode.Uri, projectFileName: string): string {
+export function getProjectFilePath(storageUri: vscode.Uri, projectFileName: string): string {
     const storagePath: string = storageUri.fsPath;
     const projectsDir = path.join(storagePath, "projects");
     // Ensure the projects directory exists
@@ -85,14 +85,9 @@ export function saveProject(storageUri: vscode.Uri, project: Project) {
             name: project.name,
             groups: Array.from(project.groups.values()).map((group) => ({
                 name: group.name,
-                isHighlighted: group.isHighlighted,
-                isShown: group.isShown, 
                 filters: Array.from(group.filters.values()).map((filter) => ({
                     regex: filter.regex.source,
-                    color: filter.color,
-                    isHighlighted: filter.isHighlighted,
-                    isShown: filter.isShown,
-                    isExclude: filter.isExclude,
+                    color: filter.color
                 })),
             })),
         },

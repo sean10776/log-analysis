@@ -14,3 +14,6 @@
 - [ ] Add double click to edit filter, or F2 to edit filter like change the file name
 - [ ] Enhance readme and documentation
 - [x] Change focus mode tab title
+- [x] Add import/export project functionality
+- [ ] Enhance Focus Mode decoration performance
+- [ ] Add normal plantext regex mode

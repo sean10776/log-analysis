@@ -24,7 +24,7 @@ export type EditorInfo = {
 /**
  * Cache entry for storing editor analysis results
  */
-interface EditorCacheEntry {
+export interface EditorCacheEntry {
     uri: string;                    // Editor URI
     version: number;               // Document version
     size: number;                  // Document size in bytes
@@ -503,8 +503,8 @@ export class Filter {
         } while (this.isHueTooSimilar(newHue, lastHue));
         
         lastHue = newHue;
-        const normalColor = `hsl(${newHue}, 40%, 80%)`;
-        const invertedColor = `hsl(${newHue}, 50%, 40%)`;
+        const normalColor = `hsl(${newHue}, 50%, 40%)`;
+        const invertedColor = `hsl(${newHue}, 40%, 80%)`;
         
         return { normal: normalColor, inverted: invertedColor };
     }
@@ -516,8 +516,8 @@ export class Filter {
         const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
         if (match) {
             const hue = parseInt(match[1]);
-            const normalColor = `hsl(${hue}, 40%, 80%)`;
-            const invertedColor = `hsl(${hue}, 50%, 40%)`;
+            const normalColor = `hsl(${hue}, 50%, 40%)`;
+            const invertedColor = `hsl(${hue}, 40%, 80%)`;
             
             return {
                 normal: normalColor,
@@ -529,9 +529,19 @@ export class Filter {
 
     private isHueTooSimilar(hue1: number, hue2: number): boolean {
         const hueDifference = Math.min(
-            Math.abs(hue1 - hue2), 
+            Math.abs(hue1 - hue2),
             360 - Math.abs(hue1 - hue2)
         );
         return hueDifference < 60;
+    }
+
+    /**
+     * Get cache statistics for this filter
+     */
+    public getCacheStats(): { cachedFiles: number; cacheEntries: Map<string, EditorCacheEntry> } {
+        return {
+            cachedFiles: this._editorCache.size,
+            cacheEntries: this._editorCache
+        };
     }
 }
