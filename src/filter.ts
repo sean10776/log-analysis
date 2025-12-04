@@ -150,58 +150,38 @@ export class Filter {
         return this._count;
     }
 
-    /**
-     * Process an editor and apply filter logic with caching
-     * This is the main entry point for applying the filter to an editor
-     */
-    public async processEditor(editorInfo: EditorInfo): Promise<void> {
-        if (!this._decoration) {
-            this.createDecoration();
-        }
-        const editorUri = editorInfo.uri.toString();
-        const isFocusMode = FocusProvider.isFocusUri(editorInfo.uri);
-        
-        // Focus mode editors need decoration but not cache computation
-        if (editorInfo.metaData.isFocusMode || isFocusMode) {
-            // await this.processFocusModeEditor(editorInfo);
-            // TODO 
-            return;
-        }
-        
-        this._activeEditors.set(editorUri, editorInfo);
-        
-        const cacheEntry = await this.getCachedAnalysisOrCompute(editorInfo);
-        this._editorDecorations.set(editorUri, cacheEntry.matchedRanges);
-
-        this.applyDecorationsToEditor(editorInfo, cacheEntry.matchedRanges);
+    get decoration(): vscode.TextEditorDecorationType | null {
+        return this._decoration;
     }
 
     /**
-     * Process focus mode editor
-     * Focus mode documents are virtual and filtered, so we do lightweight matching
-     * and ensure original document cache exists for accurate count
+     * Process an editor and apply filter logic with caching
+     * This is the main entry point for applying the filter to an editor
+     * 
+     * Normal mode: Analyzes the document, caches results, and applies decorations
+     * Focus mode: Only ensures the original document cache exists for FocusProvider to use
+     *            (FocusProvider manages focus mode content and decorations, not Filter)
      */
-    private async processFocusModeEditor(editorInfo: EditorInfo): Promise<void> {
-        const editor = editorInfo.editor;
-        
-        // Ensure cache exists for the original document
-        await this.ensureOriginalDocumentCache(editorInfo);
-        
-        // Skip if this filter is not shown or is exclude filter (invisible in focus mode)
-        if (!this._isShown || this._isExclude) {
-            editor.setDecorations(this._decoration!, []);
+    public async processEditor(editorInfo: EditorInfo): Promise<void> {
+        // Focus mode: Only ensure original document has cache for FocusProvider
+        // FocusProvider will use this cache to generate filtered content
+        if (editorInfo.metaData.isFocusMode) {
+            await this.ensureOriginalDocumentCache(editorInfo);
             return;
         }
         
-        // Skip if highlight is disabled
-        if (!this._isHighlighted) {
-            editor.setDecorations(this._decoration!, []);
-            return;
+        // Normal mode: Full processing with decoration
+        if (!this._decoration) {
+            this.createDecoration();
         }
         
-        // Lightweight matching - use extracted matching logic
-        const matchedRanges = this.matchLinesInDocument(editor.document);
-        editor.setDecorations(this._decoration!, matchedRanges);
+        const editorUri = editorInfo.uri.toString();
+        this._activeEditors.set(editorUri, editorInfo);
+        
+        const cacheEntry = await this.getCachedAnalysisOrCompute(editorInfo.editor.document, editorInfo.metaData);
+        this._editorDecorations.set(editorUri, cacheEntry.matchedRanges);
+
+        this.applyDecorationsToEditor(editorInfo, cacheEntry.matchedRanges);
     }
 
     /**
@@ -231,27 +211,16 @@ export class Filter {
             }
             
             // Create a temporary EditorInfo for analysis
-            const tempEditorInfo: EditorInfo = {
-                editor: vscode.window.activeTextEditor!, // Temporary, only document matters
-                uri: originalUri,
-                metaData: {
-                    lineCount: originalDocument.lineCount,
-                    isLargeFile: originalDocument.lineCount > 5000,
-                    isFocusMode: false,
-                    isSelected: false
-                }
+            const originalMetaData: EditorMetaData = {
+                lineCount: originalDocument.lineCount,
+                isLargeFile: originalDocument.lineCount > 5000,
+                isFocusMode: false,
+                isSelected: false
             };
             
             // Use async analysis to avoid blocking
-            const cacheEntry = await this.getCachedAnalysisOrCompute(tempEditorInfo);
-            
-            // The cache should already be set by getCachedAnalysisOrCompute
-            // but we ensure it's using the correct URI
-            if (!this._editorCache.has(originalUriString)) {
-                cacheEntry.lastAnalyzed = Date.now();
-                this._editorCache.set(originalUriString, cacheEntry);
-                this.enforceMaxCacheSize();
-            }
+            const cacheEntry = await this.getCachedAnalysisOrCompute(originalDocument, originalMetaData);
+            console.log(`Focus mode: Cached analysis for original document ${originalUri.toString()} with ${cacheEntry.count} matches.`);
         } catch (error) {
             console.error('Failed to analyze original document for focus mode:', error);
         }
@@ -332,9 +301,10 @@ export class Filter {
             }
             
             // If no valid cache, compute synchronously (fallback)
+            const document = editorInfo.editor.document;
             const syncEntry = editorInfo.metaData.isLargeFile ? 
-                this.computeOptimizedAnalysis(editorInfo) : 
-                this.computeAnalysis(editorInfo);
+                this.computeOptimizedAnalysis(document) : 
+                this.computeAnalysis(document);
             return syncEntry.matchedLineNumbers;
         } else {
             const allLineNumbers: number[] = [];
@@ -348,21 +318,20 @@ export class Filter {
     /**
      * Get cached analysis or compute new one (async to avoid blocking)
      */
-    private async getCachedAnalysisOrCompute(editorInfo: EditorInfo): Promise<EditorCacheEntry> {
-        const editorUri = editorInfo.editor.document.uri.toString();
-        const document = editorInfo.editor.document;
+    private async getCachedAnalysisOrCompute(document: vscode.TextDocument, metaData: EditorMetaData): Promise<EditorCacheEntry> {
+        const editorUri = document.uri.toString();
 
         this.cleanupExpiredCache();
 
         const cachedEntry = this._editorCache.get(editorUri);
-        if (cachedEntry && this.isCacheValid(cachedEntry, document, editorInfo.metaData)) {
+        if (cachedEntry && this.isCacheValid(cachedEntry, document, metaData)) {
             return cachedEntry;
         }
 
         // Compute analysis asynchronously to avoid blocking UI
-        const newEntry = await (editorInfo.metaData.isLargeFile ? 
-            this.computeOptimizedAnalysisAsync(editorInfo) : 
-            this.computeAnalysisAsync(editorInfo));
+        const newEntry = await (metaData.isLargeFile ? 
+            this.computeOptimizedAnalysisAsync(document) : 
+            this.computeAnalysisAsync(document));
         
         newEntry.lastAnalyzed = Date.now();
         
@@ -386,10 +355,9 @@ export class Filter {
     }
 
     /**
-     * Compute fresh analysis for an editor (async version)
+     * Compute fresh analysis for a document (async version)
      */
-    private async computeAnalysisAsync(editorInfo: EditorInfo): Promise<EditorCacheEntry> {
-        const document = editorInfo.editor.document;
+    private async computeAnalysisAsync(document: vscode.TextDocument): Promise<EditorCacheEntry> {
         const text = document.getText();
         
         // Yield control to avoid blocking UI for large files
@@ -414,10 +382,9 @@ export class Filter {
     }
 
     /**
-     * Optimized analysis for large files (async version)
+     * Optimized analysis for large files (async version) TODO: not sure AI is correct here
      */
-    private async computeOptimizedAnalysisAsync(editorInfo: EditorInfo): Promise<EditorCacheEntry> {
-        const document = editorInfo.editor.document;
+    private async computeOptimizedAnalysisAsync(document: vscode.TextDocument): Promise<EditorCacheEntry> {
         const text = document.getText();
         const maxRanges = 500; // Performance limit
         
@@ -446,10 +413,9 @@ export class Filter {
     }
 
     /**
-     * Compute fresh analysis for an editor (sync version - kept for compatibility)
+     * Compute fresh analysis for a document (sync version - kept for compatibility)
      */
-    private computeAnalysis(editorInfo: EditorInfo): EditorCacheEntry {
-        const document = editorInfo.editor.document;
+    private computeAnalysis(document: vscode.TextDocument): EditorCacheEntry {
         const text = document.getText();
         
         // Pass text to avoid re-fetching
@@ -473,8 +439,7 @@ export class Filter {
     /**
      * Optimized analysis for large files (sync version - kept for compatibility)
      */
-    private computeOptimizedAnalysis(editorInfo: EditorInfo): EditorCacheEntry {
-        const document = editorInfo.editor.document;
+    private computeOptimizedAnalysis(document: vscode.TextDocument): EditorCacheEntry {
         const text = document.getText();
         const maxRanges = 500; // Performance limit
         
@@ -520,14 +485,6 @@ export class Filter {
         }
 
         return matchedRanges;
-    }
-
-    /**
-     * Match lines in a document and return ranges
-     * Convenience wrapper for focus mode and other uses
-     */
-    private matchLinesInDocument(document: vscode.TextDocument): vscode.Range[] {
-        return this.matchLinesInText(document.getText());
     }
 
     /**
@@ -589,8 +546,8 @@ export class Filter {
     }
 
     /**
-     * Apply decorations to specific editor (non-focus mode only)
-     * Focus mode editors are handled separately in processFocusModeEditor()
+     * Apply decorations to specific editor (normal mode only)
+     * Focus mode decorations are managed by FocusProvider, not Filter
      */
     private applyDecorationsToEditor(editorInfo: EditorInfo, matchedRanges: vscode.Range[]): void {
         if (!this._decoration) {return;}

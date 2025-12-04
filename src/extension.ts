@@ -17,11 +17,13 @@ import {
     selectProject,
     setExclude,
     exportProject,
-    importProject
+    importProject,
+    updateFilterTreeView
 } from "./commands";
 import { createState, State } from "./utils";
 import { openSettings } from "./settings";
 import { EditorCacheEntry } from "./filter";
+import { FocusProvider } from "./focusProvider";
 
 // Simple debounce with setTimeout
 let refreshTimeout: NodeJS.Timeout | null = null;
@@ -110,18 +112,20 @@ export function activate(context: vscode.ExtensionContext) {
         "filters.settings",
         state.projectTreeViewProvider);
 
-    // event listeners, include visible editor change, active editor change, document change
+    // 1. Visible editors change - refresh editors
     var disposableOnDidChangeVisibleTextEditors =
-        vscode.window.onDidChangeVisibleTextEditors((event) => {
-            refreshEditors(state);
-        });
+        vscode.window.onDidChangeVisibleTextEditors(() => refreshEditors(state));
     context.subscriptions.push(disposableOnDidChangeVisibleTextEditors);
 
+    // 2. Document change - debounce refresh editors
     // Simple debounced refresh using setTimeout
     const DEBOUNCE_DELAY = 500; // 500ms debounce delay
 
     var disposableOnDidChangeTextDocument =
         vscode.workspace.onDidChangeTextDocument((event) => {
+            if (FocusProvider.isFocusUri(event.document.uri)) {
+                return; // Ignore changes to focus documents
+            }
             // Clear existing timeout
             if (refreshTimeout) {
                 clearTimeout(refreshTimeout);
@@ -136,10 +140,9 @@ export function activate(context: vscode.ExtensionContext) {
         });
     context.subscriptions.push(disposableOnDidChangeTextDocument);
 
+    // 3. Active editor change - update filter tree view
     var disposableOnDidChangeActiveTextEditor =
-        vscode.window.onDidChangeActiveTextEditor((event) => {
-            refreshEditors(state);
-        });
+        vscode.window.onDidChangeActiveTextEditor(() => updateFilterTreeView(state));
     context.subscriptions.push(disposableOnDidChangeActiveTextEditor);
 
     //register commands

@@ -11,31 +11,168 @@ import {
 import { Filter, EditorInfo } from "./filter";
 import { FocusProvider } from "./focusProvider";
 
-export function applyHighlight(
+// ============================================================================
+// Update Interfaces - Each function has single responsibility
+// ============================================================================
+
+/**
+ * Update Project Tree View
+ * Responsibility: Refresh the project list tree view display
+ * Call when: Project added/deleted/renamed
+ */
+function updateProjectTreeView(state: State) {
+    const projectsArray = Array.from(state.projectsMap.values());
+    state.projectTreeViewProvider.update(projectsArray);
+}
+
+/**
+ * Update Filter/Group Tree View
+ * Responsibility: Refresh the filter and group tree view display
+ * Call when: Filter/Group added/deleted/renamed/reordered
+ */
+export function updateFilterTreeView(state: State) {
+    const project = state.selectedProject;
+    if (!project) {
+        return;
+    }
+    const groups = project.groups.values() || null;
+    if (!groups) {
+        return;
+    }
+    state.filterTreeViewProvider.update(Array.from(groups));
+}
+
+/**
+ * Update Focus Provider
+ * Responsibility: Bind FocusProvider to current project
+ * Call when: Project switched
+ */
+function updateFocusProvider(state: State) {
+    const project = state.selectedProject;
+    if (!project) {
+        return;
+    }
+    state.focusProvider.update(project);
+}
+
+/**
+ * Apply Filter Highlights to Editors
+ * Responsibility: Process all visible editors with all filters
+ * Call when: Filter properties changed (visibility/highlight/exclude/regex)
+ */
+async function applyFilterHighlights(
     state: State,
     editors: readonly EditorInfo[]
-): void {
+): Promise<void> {
     const filters = state.selectedProject?.filters;
     if (!filters || filters.size === 0) {
         return;
     }
-    
-    editors.forEach(({ editor, uri, metaData }) => {
+
+    const promises: Promise<void>[] = [];
+    editors.forEach((editor) => {
         filters.forEach((filter) => {
-            filter.processEditor({ editor, uri, metaData });
+            promises.push(filter.processEditor(editor));
+        });
+    });
+    await Promise.all(promises);
+}
+
+/**
+ * Refresh Focus Mode Editors
+ * Responsibility: Regenerate content for all visible focus mode editors
+ * Call when: Filter cache updated (after applyFilterHighlights)
+ */
+function refreshFocusModeEditors(state: State, editors: readonly EditorInfo[]) {
+    editors.forEach(({editor, metaData}) => {
+        if (metaData.isFocusMode) {
+            state.focusProvider.refresh(editor);
+        }
+    });
+}
+
+/**
+ * Apply Decorations to Focus Mode Editor
+ * Responsibility: Apply filter decorations to focus mode document
+ * Call when: Focus mode content has been refreshed
+ */
+function applyFocusModeDecorations(state: State, focusEditor: vscode.TextEditor): void {
+    // 1. Apply focus mode marker (identity decoration)
+    FocusProvider.applyFocusModeMarker(focusEditor);
+
+    // 2. Apply filter decorations
+    const originalUri = FocusProvider.getOriginalUri(focusEditor.document.uri);
+    if (!originalUri) {
+        return;
+    }
+
+    const filters = state.selectedProject?.filters;
+    if (!filters) {
+        return;
+    } 
+
+    vscode.workspace.openTextDocument(originalUri).then(originalDoc => {
+        // Get visible lines in focus document
+        const visibleLines = state.focusProvider.getVisibleLines(
+            originalUri.toString(), 
+            originalDoc
+        );
+
+        // Apply each filter's decoration
+        filters.forEach(filter => {
+            // Only apply decoration if filter is highlighted and not exclude
+            if (!filter.decoration || !filter.isHighlighted || filter.isExclude) {
+                return;
+            }
+
+            const matchedLines = filter.getMatchedLineNumbers(originalUri.toString());
+            const focusRanges = buildFocusDecorationRanges(matchedLines, visibleLines);
+            
+            focusEditor.setDecorations(filter.decoration, focusRanges);
         });
     });
 }
 
-// refresh filter tree. should be called after any change to the filters or groups
-function refreshFilterGroupTreeView(state: State) {
-    state.filterTreeViewProvider.update(Array.from(state.selectedProject?.groups.values() || []));
+/**
+ * Build decoration ranges for focus document
+ * @param matchedLines - Line numbers in original document
+ * @param visibleLines - Sorted line numbers visible in focus document
+ */
+function buildFocusDecorationRanges(
+    matchedLines: number[],
+    visibleLines: number[]
+): vscode.Range[] {
+    const ranges: vscode.Range[] = [];
+    
+    matchedLines.forEach(originalLineNum => {
+        // Find the position of this original line in focus document
+        const focusLineIndex = visibleLines.indexOf(originalLineNum);
+        if (focusLineIndex !== -1) {
+            // Focus document line 0 is empty, so actual line number is index + 1
+            const focusLineNum = focusLineIndex + 1;
+            ranges.push(
+                new vscode.Range(
+                    new vscode.Position(focusLineNum, 0),
+                    new vscode.Position(focusLineNum, 0)
+                )
+            );
+        }
+    });
+
+    return ranges;
 }
 
-// refresh enter point will call this function for all editors or filter change
+/**
+ * Full Editor Refresh
+ * Responsibility: Complete update cycle for all visible editors
+ * Call when: Any filter change that affects display
+ * - Applies filter highlights
+ * - Refreshes focus mode content
+ * - Updates filter tree view (to reflect new count values)
+ */
 export function refreshEditors(state: State) {
     const filters = state.selectedProject?.filters;
-    if (filters?.size === 0) {
+    if (!filters || filters.size === 0) {
         return;
     }
 
@@ -52,33 +189,23 @@ export function refreshEditors(state: State) {
         }
     }));
 
-    applyHighlight(state, editorInfos);
-    refreshFilterGroupTreeView(state);
-    editorInfos.forEach(({ editor, uri, metaData }) => {
-        if (metaData.isFocusMode) {
-            state.focusProvider.refresh(editor);
-        }
+    void applyFilterHighlights(state, editorInfos).then(() => {
+        // Refresh focus mode content
+        refreshFocusModeEditors(state, editorInfos);
+        
+        // Apply decorations to focus mode editors after content is updated
+        // Use setTimeout to ensure content has been refreshed
+        setTimeout(() => {
+            editorInfos.forEach(({editor, metaData}) => {
+                if (metaData.isFocusMode) {
+                    applyFocusModeDecorations(state, editor);
+                }
+            });
+        }, 10);
+        
+        // Update tree view after cache is updated (count values may have changed)
+        updateFilterTreeView(state);
     });
-}
-
-export function updateFilterTreeViewAndFocusProvider(state: State) {
-    const project = state.selectedProject;
-    if (!project) {
-        return;
-    }
-    const groups = project.groups.values() || null;
-    if (!groups) {
-        return;
-    }
-    const groupsArray = Array.from(groups);
-    state.filterTreeViewProvider.update(groupsArray);
-    state.focusProvider.update(project);
-}
-
-// refresh project tree view. should be called after any change to the projects
-export function updateProjectTreeView(state: State) {
-    const projectsArray = Array.from(state.projectsMap.values());
-    state.projectTreeViewProvider.update(projectsArray);
 }
 
 //set bool for whether the lines matched the given filter will be kept for focus mode
@@ -107,6 +234,7 @@ export function setVisibility(
         }
     }
 
+    // Update: Filter properties changed → refresh editors (tree view auto-updated)
     refreshEditors(state);
 }
 
@@ -135,6 +263,7 @@ export function setHighlight(
         }
     }
 
+    // Update: Filter properties changed → refresh editors (tree view auto-updated)
     refreshEditors(state);
 }
 
@@ -151,6 +280,7 @@ export function setExclude(
     }
     filter.isExclude = isExclude;
 
+    // Update: Filter properties changed → refresh editors (tree view auto-updated)
     refreshEditors(state);
 }
 
@@ -192,8 +322,9 @@ export function deleteFilter(treeItem: vscode.TreeItem, state: State) {
         }
     });
     filter.dispose();
+    
+    // Update: Filter deleted → refresh editors (tree view auto-updated)
     refreshEditors(state);
-    refreshFilterGroupTreeView(state);
     saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
 }
 
@@ -212,9 +343,9 @@ export function addFilter(treeItem: vscode.TreeItem, state: State) {
             const filter = new Filter(new RegExp(regexStr));
             group!.filters.set(filter.id, filter);
             state.selectedProject?.filters.set(filter.id, filter); // for fast lookup
+            
+            // Update: Filter added → refresh editors (tree view auto-updated)
             refreshEditors(state);
-            refreshFilterGroupTreeView(state);
-            updateFilterTreeViewAndFocusProvider(state);
             saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
         });
 }
@@ -239,9 +370,9 @@ export function editFilter(treeItem: vscode.TreeItem, state: State) {
             try {
                 // Update the filter's regex using new method that handles cache invalidation
                 filter.setRegex(new RegExp(regexStr));
-                // Refresh the editors to apply changes
+                
+                // Update: Filter regex changed → refresh editors (tree view auto-updated)
                 refreshEditors(state);
-                refreshFilterGroupTreeView(state);
                 saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
             } catch (e) {
                 // Show an error message if the new regex is invalid
@@ -267,7 +398,8 @@ export function addGroup(state: State) {
             const group: Group = createGroup(name);
             state.selectedProject?.groups.set(group.id, group);
 
-            refreshFilterGroupTreeView(state);
+            // Update: Group added → update tree only (no filter change)
+            updateFilterTreeView(state);
             saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
         });
 }
@@ -288,7 +420,9 @@ export function editGroup(treeItem: vscode.TreeItem, state: State) {
                 return;
             }
             group!.name = name;
-            refreshFilterGroupTreeView(state);
+            
+            // Update: Group renamed → update tree only (no filter change)
+            updateFilterTreeView(state);
             saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
         });
 }
@@ -305,8 +439,8 @@ export function deleteGroup(treeItem: vscode.TreeItem, state: State) {
     });
     state.selectedProject?.groups.delete(treeItem.id!);
 
+    // Update: Group and filters deleted → refresh editors (tree view auto-updated)
     refreshEditors(state);
-    refreshFilterGroupTreeView(state);
     saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
 }
 
@@ -406,11 +540,18 @@ export function deleteProject(treeItem: vscode.TreeItem, state: State) {
 
     state.projectsMap.delete(treeItem.id!);
     deleteProjectFile(state.globalStorageUri, project);
+    
+    // Update: Project deleted
     if (selectChanged) {
-        updateFilterTreeViewAndFocusProvider(state);
+        // Current project deleted → update all (refreshEditors will update filter tree)
+        updateProjectTreeView(state);
+        updateFocusProvider(state);
         refreshEditors(state);
+    } else {
+        // Other project deleted → update project tree only
+        updateProjectTreeView(state);
     }
-    updateProjectTreeView(state);
+    
     saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
 }
 
@@ -441,9 +582,9 @@ export function selectProject(
         });
     }
 
-    // Sync Maps after switching projects
+    // Update: Project switched → update all (refreshEditors will update filter tree)
     updateProjectTreeView(state);
-    updateFilterTreeViewAndFocusProvider(state);
+    updateFocusProvider(state);
     refreshEditors(state);
     saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
     return true;
@@ -473,9 +614,10 @@ export function refreshSettings(state: State) {
         saveSettings(state.globalStorageUri, state.projectsMap, state.selectedProject);
     }
 
-    refreshEditors(state);
+    // Update: Settings reloaded → update all (refreshEditors will update filter tree)
     updateProjectTreeView(state);
-    updateFilterTreeViewAndFocusProvider(state);
+    updateFocusProvider(state);
+    refreshEditors(state);
 }
 
 export async function exportProject(state: State, projectItem: any) {

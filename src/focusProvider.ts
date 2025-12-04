@@ -11,6 +11,11 @@ import * as path from "path";
  * 
  * The documents created by this provider are automatically READ-ONLY by VS Code design.
  * Users cannot edit these virtual documents - they serve as filtered views of the original files.
+ * 
+ * Responsibilities:
+ * - Generate filtered content (provideTextDocumentContent)
+ * - Provide focus mode marker decoration (static methods)
+ * - Provide helper methods for calculating visible lines
  */
 export class FocusProvider implements vscode.TextDocumentContentProvider {
     project: Project | null;
@@ -19,6 +24,7 @@ export class FocusProvider implements vscode.TextDocumentContentProvider {
         this.project = project;
     }
 
+    // Focus mode marker decoration (identity of focus mode)
     private static readonly focusDecorationType = vscode.window.createTextEditorDecorationType({
         before: {
             contentText: ">>>>>>>focus mode<<<<<<<",
@@ -30,8 +36,22 @@ export class FocusProvider implements vscode.TextDocumentContentProvider {
     ];
 
     /**
+     * Apply focus mode marker decoration to editor
+     * This is the visual identity of focus mode documents
+     */
+    static applyFocusModeMarker(editor: vscode.TextEditor): void {
+        if (!FocusProvider.isFocusUri(editor.document.uri)) {
+            return;
+        }
+        editor.setDecorations(
+            FocusProvider.focusDecorationType, 
+            FocusProvider.focusDecorationRangeArray
+        );
+    }
+
+    /**
      * Provides read-only text content for virtual focus documents.
-     * This method leverages Filter caching for improved performance.
+     * Only responsible for generating filtered content, not decorations.
      * 
      * @param uri Virtual document URI in format "focus:/Focus: filename?source=<encoded-original-uri>"
      * @returns Promise<string> Filtered content as read-only text
@@ -40,15 +60,9 @@ export class FocusProvider implements vscode.TextDocumentContentProvider {
         // Parse the original URI from the query parameter
         const queryParams = new URLSearchParams(uri.query);
         const originalUriString = queryParams.get('source');
-        
-        if (!originalUriString) {
-            // Fallback to old format for backward compatibility
-            const originalUri = vscode.Uri.parse(uri.path);
-            const sourceDocument = await vscode.workspace.openTextDocument(originalUri);
-            return this.generateFilteredContent(originalUri.toString(), sourceDocument);
-        }
-        
-        const originalUri = vscode.Uri.parse(decodeURIComponent(originalUriString));
+
+        const uriString = originalUriString ? decodeURIComponent(originalUriString) : uri.path;
+        const originalUri = vscode.Uri.parse(uriString);
         const sourceDocument = await vscode.workspace.openTextDocument(originalUri);
         return this.generateFilteredContent(originalUri.toString(), sourceDocument);
     }
@@ -65,7 +79,9 @@ export class FocusProvider implements vscode.TextDocumentContentProvider {
             // Collect line numbers from positive filters using their cached results
             positiveFilters.forEach(filter => {
                 const lineNumbers = filter.getMatchedLineNumbers(originalUri.toString());
-                lineNumbers.forEach(lineNum => resultLines.add(lineNum));
+                lineNumbers.forEach(lineNum => {
+                    resultLines.add(lineNum);
+                });
             });
         } else {
             // Include all lines if no positive filters
@@ -115,6 +131,39 @@ export class FocusProvider implements vscode.TextDocumentContentProvider {
         return { positiveFilters, excludeFilters };
     }
 
+    /**
+     * Get visible line numbers in focus mode document
+     * Helper method for commands to calculate filter decorations
+     * 
+     * @param originalUri Original document URI string
+     * @param originalDoc Original document
+     * @returns Sorted array of line numbers visible in focus document
+     */
+    getVisibleLines(originalUri: string, originalDoc: vscode.TextDocument): number[] {
+        const { positiveFilters, excludeFilters } = this.getActiveFilters();
+        let resultLines: Set<number> = new Set();
+
+        if (positiveFilters.length > 0) {
+            // Collect line numbers from positive filters
+            positiveFilters.forEach(filter => {
+                const lineNumbers = filter.getMatchedLineNumbers(originalUri);
+                lineNumbers.forEach(lineNum => resultLines.add(lineNum));
+            });
+        } else {
+            // Include all lines if no positive filters
+            for (let i = 0; i < originalDoc.lineCount; i++) {
+                resultLines.add(i);
+            }
+            // Remove excluded lines
+            excludeFilters.forEach(filter => {
+                const excludedLines = filter.getMatchedLineNumbers(originalUri);
+                excludedLines.forEach(lineNum => resultLines.delete(lineNum));
+            });
+        }
+
+        return Array.from(resultLines).sort((a, b) => a - b);
+    }
+
     // Event emitter for document change notifications (required by VS Code API)
     private onDidChangeEmitter = new vscode.EventEmitter<vscode.Uri>();
     readonly onDidChange = this.onDidChangeEmitter.event;
@@ -122,12 +171,11 @@ export class FocusProvider implements vscode.TextDocumentContentProvider {
     /**
      * Refresh the virtual document content.
      * This triggers VS Code to call provideTextDocumentContent again.
-     * 
-     * @param uri The URI of the virtual document to refresh
+     * Decorations are applied separately by commands.
      */
     refresh(editor: vscode.TextEditor): void {
-        editor.setDecorations(FocusProvider.focusDecorationType, FocusProvider.focusDecorationRangeArray);
-        this.onDidChangeEmitter.fire(editor.document.uri);
+        const uri = editor.document.uri;
+        this.onDidChangeEmitter.fire(uri);
     }
 
     /**
