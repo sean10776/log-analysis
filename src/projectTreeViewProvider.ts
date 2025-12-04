@@ -33,6 +33,7 @@ export class ProjectItem extends vscode.TreeItem {
     constructor(project: Project) {
         super(project.name, vscode.TreeItemCollapsibleState.None);
         this.id = project.id;
+        this.contextValue = "project";
         this.command = {
             command: 'logfocus.selectProject',
             title: 'Select Project',

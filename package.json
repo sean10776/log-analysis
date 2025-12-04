@@ -8,7 +8,7 @@
         "url": "https://github.com/sean10776/LogFocus.git"
     },
     "icon": "image/new_icon.png",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "engines": {
         "vscode": "^1.49.0"
     },
@@ -114,6 +114,20 @@
             {
                 "command": "logfocus.selectProject",
                 "title": "Select project"
+            },
+            {
+                "command": "logfocus.exportProject",
+                "title": "Export Project",
+                "icon": "$(export)"
+            },
+            {
+                "command": "logfocus.showFilterStats",
+                "title": "LogFocus: Show Filter and Cache Statistics"
+            },
+            {
+                "command": "logfocus.importProject",
+                "title": "Import Project",
+                "icon": "$(symbol-reference)"
             }
         ],
         "menus": {
@@ -145,8 +159,13 @@
                 },
                 {
                     "command": "logfocus.editProject",
-                    "when": "view == filters.settings",
+                    "when": "view == filters.settings && viewItem == project",
                     "group": "inline@2"
+                },
+                {
+                    "command": "logfocus.exportProject",
+                    "when": "view == filters.settings && viewItem == project",
+                    "group": "inline@3"
                 },
                 {
                     "command": "logfocus.disableHighlight",
@@ -180,7 +199,7 @@
                 },
                 {
                     "command": "logfocus.deleteProject",
-                    "when": "view == filters.settings",
+                    "when": "view == filters.settings && viewItem == project",
                     "group": "inline@5"
                 }
             ],
@@ -199,6 +218,11 @@
                     "command": "logfocus.addProject",
                     "when": "view == filters.settings",
                     "group": "navigation@1"
+                },
+                {
+                    "command": "logfocus.importProject",
+                    "when": "view == filters.settings",
+                    "group": "navigation@1.5"
                 },
                 {
                     "command": "logfocus.openSettings",

@@ -1,7 +1,7 @@
 - [ ] jump from a line in focus mode to the same line in original document and vice versa
-- [X] connect to a keybinding
-- [X] update focus mode when adding/removing filters or changing filter visibility
-- [X] Add support for editing
+- [x] connect to a keybinding
+- [x] update focus mode when adding/removing filters or changing filter visibility
+- [x] Add support for editing
 - [ ] file specific filters
 - [ ] Add one click remove all filters
 - [x] Add invert filter feature
@@ -14,3 +14,11 @@
 - [ ] Add double click to edit filter, or F2 to edit filter like change the file name
 - [ ] Enhance readme and documentation
 - [x] Change focus mode tab title
+- [x] Add import/export project functionality
+- [x] Enhance Focus Mode decoration performance
+- [x] Fix Focus Mode filter count accuracy
+- [ ] Add normal plaintext regex mode
+- [x] Refactor update interfaces with single responsibility principle
+- [x] Fix async timing issue for tree view updates
+- [x] Separate Focus Mode decoration management (FocusProvider vs Commands)
+- [ ] Large file editing performance optimization (adaptive throttling, delayed update, dirty marking)

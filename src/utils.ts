@@ -65,15 +65,17 @@ export type State = {
     projectTreeViewProvider: ProjectTreeViewProvider;
     focusProvider: FocusProvider;
     globalStorageUri: vscode.Uri;
+    outputChannel: vscode.OutputChannel;
 };
-export function createState(globalStorageUri: vscode.Uri): State {
+export function createState(globalStorageUri: vscode.Uri, outputChannel: vscode.OutputChannel): State {
     return {
         projectsMap: new Map<string, Project>(),
         selectedProject: null,
         filterTreeViewProvider: new FilterTreeViewProvider([]),
         projectTreeViewProvider: new ProjectTreeViewProvider([]),
         focusProvider: new FocusProvider(),
-        globalStorageUri: globalStorageUri
+        globalStorageUri: globalStorageUri,
+        outputChannel: outputChannel
     };
 }
 
